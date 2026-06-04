@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package minimaya.vcs;
+
+option java_package = "com.minimaya.proto.vcs";
+option java_outer_classname = "VcsProto";
+option java_multiple_files = true;
+
+// Git-style version control for 3D scenes.
+// Heavy geometry lives in CAS (MinIO/Postgres @Lob).
+// Commits and branches are lightweight relational pointers.
+
+message CasObject {
+  string sha256     = 1;  // content-addressable key
+  uint64 size_bytes = 2;
+  string mime_type  = 3;
+  string storage_url = 4; // presigned MinIO URL
+}
+
+message TreeEntry {
+  string name       = 1;  // node name within parent
+  string object_sha = 2;  // SHA of mesh CAS object
+  string node_id    = 3;
+}
+
+message Tree {
+  string sha256             = 1;
+  repeated TreeEntry entries = 2;
+}
+
+message Commit {
+  string sha256         = 1;
+  string tree_sha       = 2;
+  string parent_sha     = 3;  // empty for root commit
+  repeated string merge_parent_shas = 4;  // for merges
+  string author         = 5;
+  int64  timestamp_ms   = 6;
+  string message        = 7;
+  string scene_id       = 8;
+}
+
+message Branch {
+  string name       = 1;
+  string head_sha   = 2;  // points to Commit.sha256
+  string scene_id   = 3;
+  bool   is_default = 4;
+}
+
+message Tag {
+  string name       = 1;
+  string commit_sha = 2;
+  string message    = 3;
+}

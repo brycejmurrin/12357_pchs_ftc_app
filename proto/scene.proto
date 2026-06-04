@@ -1,0 +1,103 @@
+syntax = "proto3";
+
+package minimaya.scene;
+
+option java_package = "com.minimaya.proto.scene";
+option java_outer_classname = "SceneProto";
+option java_multiple_files = true;
+
+// ─── Scene Graph ────────────────────────────────────────────────────────────
+
+message Scene {
+  string id        = 1;
+  string name      = 2;
+  string commit_id = 3;
+  repeated SceneNode nodes     = 4;
+  repeated Material  materials = 5;
+}
+
+message SceneNode {
+  string    id          = 1;
+  string    name        = 2;
+  Transform transform   = 3;
+  string    material_id = 4;
+  repeated string children = 5;
+
+  oneof geometry {
+    Mesh   inline_mesh = 6;
+    string mesh_ref    = 7;  // CAS SHA-256 key
+  }
+}
+
+message Transform {
+  // 4×4 column-major matrix (16 floats). Identity if empty.
+  repeated float matrix = 1 [packed = true];
+}
+
+// ─── Geometry ───────────────────────────────────────────────────────────────
+
+message Mesh {
+  // Raw float32 byte arrays — treated as opaque blobs by the Java backend.
+  bytes vertices = 1;  // XYZ  triples
+  bytes normals  = 2;  // XYZ  triples, one per vertex
+  bytes uvs      = 3;  // UV   pairs
+  bytes indices  = 4;  // uint32 triangle list
+  string cas_hash = 5; // SHA-256 of (vertices || indices)
+  uint32 vertex_count = 6;
+  uint32 index_count  = 7;
+}
+
+// ─── Materials ──────────────────────────────────────────────────────────────
+
+message Material {
+  string id   = 1;
+  string name = 2;
+
+  // PBR values
+  float base_color_r = 3;
+  float base_color_g = 4;
+  float base_color_b = 5;
+  float base_color_a = 6;
+  float metallic     = 7;
+  float roughness    = 8;
+  float emissive_r   = 9;
+  float emissive_g   = 10;
+  float emissive_b   = 11;
+
+  // Texture asset keys (resolved via MinIO presigned URL)
+  string albedo_texture_key    = 12;
+  string normal_texture_key    = 13;
+  string roughness_texture_key = 14;
+}
+
+// ─── Scene Delta (incremental streaming update) ──────────────────────────────
+
+message SceneDelta {
+  string scene_id    = 1;
+  string session_id  = 2;
+
+  repeated SceneNode upserted_nodes  = 3;
+  repeated string    deleted_node_ids = 4;
+  repeated Material  upserted_materials = 5;
+}
+
+// ─── WebSocket Envelope ─────────────────────────────────────────────────────
+
+message SceneMessage {
+  enum Type {
+    UNKNOWN       = 0;
+    SCENE_FULL    = 1;  // full scene snapshot
+    SCENE_DELTA   = 2;  // incremental update
+    ACK           = 3;
+    ERROR         = 4;
+  }
+
+  Type   type       = 1;
+  string message_id = 2;
+  string error_msg  = 3;
+
+  oneof payload {
+    Scene      scene = 4;
+    SceneDelta delta = 5;
+  }
+}
