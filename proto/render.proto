@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package minimaya.render;
+
+option java_package = "com.minimaya.proto.render";
+option java_outer_classname = "RenderProto";
+option java_multiple_files = true;
+
+// ─── Render Job ─────────────────────────────────────────────────────────────
+
+enum RenderEngine {
+  RENDER_ENGINE_UNSPECIFIED = 0;
+  CYCLES                    = 1;
+  EEVEE                     = 2;
+}
+
+enum RenderStatus {
+  STATUS_UNSPECIFIED = 0;
+  QUEUED             = 1;
+  RUNNING            = 2;
+  PREVIEWING         = 3;  // low-res preview frames being streamed
+  COMPLETE           = 4;
+  FAILED             = 5;
+  CANCELLED          = 6;
+}
+
+message RenderSettings {
+  uint32 width          = 1;
+  uint32 height         = 2;
+  uint32 samples        = 3;
+  RenderEngine engine   = 4;
+  bool   use_denoiser   = 5;
+  uint32 preview_samples = 6;  // samples for interim preview frames
+}
+
+message RenderJob {
+  string id              = 1;
+  string project_id      = 2;
+  string commit_sha      = 3;  // exact scene version to render
+  string user_id         = 4;
+  RenderSettings settings = 5;
+  RenderStatus status    = 6;
+  int64  created_at_ms   = 7;
+  int64  started_at_ms   = 8;
+  int64  completed_at_ms = 9;
+  string result_asset_key = 10;  // MinIO key for final image
+  string error_message   = 11;
+}
+
+// ─── Preview Frame (streamed during render) ──────────────────────────────────
+
+message PreviewFrame {
+  string job_id        = 1;
+  uint32 sample_number = 2;
+  string preview_url   = 3;   // MinIO presigned URL to compressed JPEG
+  float  progress      = 4;   // 0.0 – 1.0
+}
+
+// ─── RabbitMQ message envelopes ─────────────────────────────────────────────
+
+message RenderJobMessage {
+  RenderJob job            = 1;
+  string    minio_endpoint = 2;
+  string    minio_bucket   = 3;
+}
+
+message RenderResultMessage {
+  string job_id          = 1;
+  RenderStatus status    = 2;
+  string result_asset_key = 3;
+  string error_message   = 4;
+}
+
+message PreviewFrameMessage {
+  PreviewFrame frame = 1;
+}
